@@ -26,8 +26,8 @@ const unit: Unit = {
   target: null,
 };
 
-let dragging: boolean = false;
 let aiming: boolean = false;
+let potentialAim: boolean = false;
 let aimEnd: { x: number; y: number } = { x: 0, y: 0 };
 
 const draw = (): void => {
@@ -68,9 +68,23 @@ const draw = (): void => {
       aimEnd.x - headLen * Math.cos(angle + Math.PI / 6),
       aimEnd.y - headLen * Math.sin(angle + Math.PI / 6),
     );
-    ctx.strokeStyle = "black";
+    ctx.strokeStyle = "rgb(0 0 200/ 50%";
     ctx.lineWidth = 2;
+
     ctx.stroke();
+
+    ctx.beginPath();
+    ctx.fillStyle = "rgb(0 0 200 / 50%)";
+    ctx.arc(aimEnd.x, aimEnd.y, unit.radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if (unit.state === "preparing") {
+    if (!unit?.target?.x || !unit?.target?.y) return;
+    ctx.beginPath();
+    ctx.fillStyle = "rgb(0 0 200 / 50%)";
+    ctx.arc(unit.target.x, unit.target.y, unit.radius, 0, Math.PI * 2);
+    ctx.fill();
   }
 };
 
@@ -89,6 +103,7 @@ canvas.addEventListener("mousedown", (e) => {
   } else {
     // Clicked empty space with nothing selected → deselect
     unit.selected = false;
+    potentialAim = true;
   }
 });
 
