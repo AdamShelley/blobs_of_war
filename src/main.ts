@@ -1,7 +1,8 @@
 import "./style.css";
 
 type UnitMoveState = "idle" | "preparing" | "moving";
-const PREPARATION_MS = 2000;
+const PREPARATION_MS = 1000;
+const TRAVEL_SPEED = 3;
 
 interface Unit {
   x: number;
@@ -130,6 +131,22 @@ const loop = () => {
     if (unit.orderIssuedAt && timeNow - unit.orderIssuedAt > PREPARATION_MS) {
       unit.state = "moving";
       console.log("MOVING");
+    }
+  }
+
+  if (unit.state === "moving") {
+    if (!unit.target) return;
+    const dx = unit.target.x - unit.x;
+    const dy = unit.target.y - unit.y;
+
+    const length = Math.sqrt(dx ** 2 + dy ** 2);
+
+    if (length < TRAVEL_SPEED) {
+      unit.state = "idle";
+      unit.target = null;
+    } else {
+      unit.x += (dx / length) * TRAVEL_SPEED;
+      unit.y += (dy / length) * TRAVEL_SPEED;
     }
   }
 
