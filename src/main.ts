@@ -1,9 +1,7 @@
 import "./style.css";
 
+// Types
 type UnitMoveState = "idle" | "preparing" | "moving";
-const PREPARATION_MS = 500;
-const TRAVEL_SPEED = 2.5;
-const DRAG_BOUNDARY = 100;
 
 interface Unit {
   x: number;
@@ -17,13 +15,21 @@ interface Unit {
   facing: number;
 }
 
+// Constants
+const PREPARATION_MS = 500 as const;
+const TRAVEL_SPEED = 2.5 as const;
+const DRAG_BOUNDARY = 100 as const;
+const SPACING = 25 as const;
+const UNIT_PADDING = 5 as const;
+const SIZE = 800 as const;
+
 const canvas = document.getElementById("game")! as HTMLCanvasElement;
 const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 
 const unit: Unit = {
   x: 400,
   y: 300,
-  radius: 30,
+  radius: 10,
   selected: false,
   state: "idle",
   orderIssuedAt: null,
@@ -32,6 +38,15 @@ const unit: Unit = {
   facing: 0,
 };
 
+// Canvas setup
+const scale = window.devicePixelRatio;
+canvas.width = Math.floor(SIZE * scale);
+canvas.height = Math.floor(SIZE * scale);
+canvas.style.width = SIZE + "px";
+canvas.style.height = SIZE + "px";
+ctx.scale(scale, scale);
+
+// Variables
 let aiming: boolean = false;
 let potentialAim: boolean = false;
 let aimEnd: { x: number; y: number } = { x: 0, y: 0 };
@@ -39,51 +54,80 @@ let mouseDown: { x: number; y: number } = { x: 0, y: 0 };
 let squish = 0;
 let currentSpeed = 0;
 
-const size = 800;
-const scale = window.devicePixelRatio;
-canvas.width = Math.floor(size * scale);
-canvas.height = Math.floor(size * scale);
-canvas.style.width = size + "px";
-canvas.style.height = size + "px";
-
-// Normalize coordinate system to use CSS pixels.
-ctx.scale(scale, scale);
-
+// Functionality
 const draw = (): void => {
-  ctx.clearRect(0, 0, size, size);
+  ctx.clearRect(0, 0, SIZE, SIZE);
 
-  ctx.beginPath();
+  const colOffsets = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5];
+  const rowOffsets = [-0.5, 0.5];
+
+  // Moving unit circles
   if (unit.state === "moving") {
-    ctx.ellipse(
-      unit.x,
-      unit.y,
-      unit.radius - squish * 2,
-      unit.radius + squish * 0.5,
-      unit.facing,
-      0,
-      Math.PI * 2,
-    );
+    for (let j = 0; j < rowOffsets.length; j++) {
+      for (let i = 0; i < colOffsets.length; i++) {
+        ctx.beginPath();
+        ctx.ellipse(
+          unit.x + colOffsets[i] * SPACING,
+          unit.y + rowOffsets[j] * SPACING,
+          unit.radius - squish * 1,
+          unit.radius + squish * 0.2,
+          unit.facing,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fill();
+      }
+    }
   } else {
-    ctx.arc(unit.x, unit.y, unit.radius, 0, Math.PI * 2);
+    // Static unit circles
+    for (let j = 0; j < rowOffsets.length; j++) {
+      for (let i = 0; i < colOffsets.length; i++) {
+        ctx.beginPath();
+
+        ctx.arc(
+          unit.x + colOffsets[i] * SPACING,
+          unit.y + rowOffsets[j] * SPACING,
+          unit.radius,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fill();
+      }
+    }
   }
 
   ctx.fillStyle = "rgb(92, 42, 24)";
-  ctx.fill();
 
-  ctx.beginPath();
-  ctx.arc(
-    unit.x,
-    unit.y,
-    unit.radius + 4,
-    unit.facing - Math.PI / 3,
-    unit.facing + Math.PI / 3,
-  );
-  ctx.strokeStyle = "rgb(120, 120, 120)";
-  ctx.stroke();
+  // Shield
+  for (let j = 0; j < rowOffsets.length; j++) {
+    for (let i = 0; i < colOffsets.length; i++) {
+      ctx.beginPath();
+      ctx.strokeStyle = "rgb(255, 255, 255)";
+      ctx.lineWidth = 2;
+      ctx.arc(
+        unit.x + colOffsets[i] * SPACING,
+        unit.y + rowOffsets[j] * SPACING,
+        unit.radius + 2,
+        unit.facing - Math.PI / 3,
+        unit.facing + Math.PI / 3,
+      );
+
+      ctx.stroke();
+    }
+  }
 
   if (unit.selected) {
-    ctx.strokeStyle = "rgb(0, 0, 0)";
-    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.lineWidth = 1;
+    ctx.roundRect(
+      unit.x - (colOffsets.length * SPACING) / 2 - UNIT_PADDING,
+      unit.y - (rowOffsets.length * SPACING) / 2 - UNIT_PADDING,
+      colOffsets.length * SPACING + UNIT_PADDING * 2,
+      rowOffsets.length * SPACING + UNIT_PADDING * 2,
+      5,
+    );
+    ctx.strokeStyle = "rgb(255, 255, 255)";
+    ctx.lineWidth = 2;
     ctx.stroke();
   }
 
@@ -118,7 +162,22 @@ const draw = (): void => {
 
     ctx.beginPath();
     ctx.fillStyle = "rgb(0 0 200 / 50%)";
-    ctx.arc(aimEnd.x, aimEnd.y, unit.radius, 0, Math.PI * 2);
+
+    for (let j = 0; j < rowOffsets.length; j++) {
+      for (let i = 0; i < colOffsets.length; i++) {
+        ctx.beginPath();
+
+        ctx.arc(
+          aimEnd.x + colOffsets[i] * SPACING,
+          aimEnd.y + rowOffsets[j] * SPACING,
+          unit.radius + 2,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fill();
+      }
+    }
+
     ctx.fill();
   }
 
@@ -126,12 +185,28 @@ const draw = (): void => {
     if (!unit?.target?.x || !unit?.target?.y) return;
     ctx.beginPath();
     ctx.fillStyle = "rgb(0 0 200 / 50%)";
-    ctx.arc(unit.target.x, unit.target.y, unit.radius, 0, Math.PI * 2);
-    ctx.fill();
+    for (let j = 0; j < rowOffsets.length; j++) {
+      for (let i = 0; i < colOffsets.length; i++) {
+        ctx.beginPath();
+        ctx.arc(
+          unit.x + colOffsets[i] * SPACING,
+          unit.y + rowOffsets[j] * SPACING,
+          unit.radius,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fill();
+      }
+    }
   }
 };
 
 canvas.addEventListener("mousedown", (e) => {
+  //   unit.x - (colOffsets.length * SPACING) / 2 - UNIT_PADDING,
+  // unit.y - (rowOffsets.length * SPACING) / 2 - UNIT_PADDING,
+  // colOffsets.length * SPACING + UNIT_PADDING * 2,
+  // rowOffsets.length * SPACING + UNIT_PADDING * 2,
+
   const dx = e.offsetX - unit.x;
   const dy = e.offsetY - unit.y;
   const clickedunit = dx * dx + dy * dy < unit.radius * unit.radius;
