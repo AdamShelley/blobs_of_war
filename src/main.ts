@@ -18,7 +18,7 @@ interface Unit {
 // Constants
 const PREPARATION_MS = 500 as const;
 const TRAVEL_SPEED = 2.5 as const;
-const DRAG_BOUNDARY = 100 as const;
+const DRAG_BOUNDARY = 10 as const;
 const SPACING = 25 as const;
 const UNIT_PADDING = 5 as const;
 const SIZE = 800 as const;
@@ -46,6 +46,9 @@ canvas.style.width = SIZE + "px";
 canvas.style.height = SIZE + "px";
 ctx.scale(scale, scale);
 
+const colOffsets = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5];
+const rowOffsets = [-0.5, 0.5];
+
 // Variables
 let aiming: boolean = false;
 let potentialAim: boolean = false;
@@ -57,9 +60,6 @@ let currentSpeed = 0;
 // Functionality
 const draw = (): void => {
   ctx.clearRect(0, 0, SIZE, SIZE);
-
-  const colOffsets = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5];
-  const rowOffsets = [-0.5, 0.5];
 
   // Moving unit circles
   if (unit.state === "moving") {
@@ -201,54 +201,71 @@ const draw = (): void => {
   }
 };
 
+canvas.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+});
+
 canvas.addEventListener("mousedown", (e) => {
-  //   unit.x - (colOffsets.length * SPACING) / 2 - UNIT_PADDING,
-  // unit.y - (rowOffsets.length * SPACING) / 2 - UNIT_PADDING,
-  // colOffsets.length * SPACING + UNIT_PADDING * 2,
-  // rowOffsets.length * SPACING + UNIT_PADDING * 2,
+  if (e.button == 0) {
+    const leftEdge = unit.x - (colOffsets.length * SPACING) / 2 - UNIT_PADDING;
+    const width = colOffsets.length * SPACING + UNIT_PADDING * 2;
+    const rightEdge = leftEdge + width;
 
-  const dx = e.offsetX - unit.x;
-  const dy = e.offsetY - unit.y;
-  const clickedunit = dx * dx + dy * dy < unit.radius * unit.radius;
-  mouseDown.x = e.offsetX;
-  mouseDown.y = e.offsetY;
+    const topEdge = unit.y - (rowOffsets.length * SPACING) / 2 - UNIT_PADDING;
+    const height = rowOffsets.length * SPACING + UNIT_PADDING * 2;
+    const bottomEdge = topEdge + height;
 
-  if (unit.selected && !clickedunit) {
-    // Already selected, clicking elsewhere → start aiming an arrow
-    aimEnd = { x: e.offsetX, y: e.offsetY };
-    potentialAim = true;
-  } else if (clickedunit) {
-    // Tap the unit → select it
-    unit.selected = true;
-  } else {
-    // Clicked empty space with nothing selected → deselect
-    unit.selected = false;
+    const dx = e.offsetX > leftEdge && e.offsetX < rightEdge;
+    const dy = e.offsetY < bottomEdge && e.offsetY > topEdge;
+    const clickedunit = dx && dy;
+
+    mouseDown.x = e.offsetX;
+    mouseDown.y = e.offsetY;
+
+    if (unit.selected) {
+      // Already selected, clicking elsewhere → start aiming an arrow
+      aimEnd = { x: e.offsetX, y: e.offsetY };
+      potentialAim = true;
+    } else if (clickedunit) {
+      // Tap the unit → select it
+      unit.selected = true;
+    } else {
+      // Clicked empty space with nothing selected → deselect
+      unit.selected = false;
+    }
+  } else if (e.button === 2) {
   }
 });
 
 canvas.addEventListener("mousemove", (e) => {
   // calculate the distance dx / dy
+  if (e.button === 0) {
+    if (potentialAim) {
+      const dx = e.offsetX - mouseDown.x;
+      const dy = e.offsetY - mouseDown.y;
+      const length = Math.sqrt(dx ** 2 + dy ** 2);
 
-  if (potentialAim) {
-    const dx = e.offsetX - mouseDown.x;
-    const dy = e.offsetY - mouseDown.y;
-    const length = Math.sqrt(dx ** 2 + dy ** 2);
-
-    if (length > DRAG_BOUNDARY) {
-      aiming = true;
+      if (length > DRAG_BOUNDARY) {
+        aiming = true;
+      }
     }
-  }
 
-  if (aiming) {
-    aimEnd = { x: e.offsetX, y: e.offsetY };
+    if (aiming) {
+      aimEnd = { x: e.offsetX, y: e.offsetY };
+    }
+  } else if (e.button === 2) {
+    unit.facing = e.offsetX;
   }
 });
 
 canvas.addEventListener("mouseup", () => {
+  if (potentialAim && !aiming) {
+    unit.selected = false;
+  }
+
   if (aiming) {
     unit.orderIssuedAt = null;
-    // Here's where you'd issue the order — e.g. set a move target
-    // For now, just stop aiming
+    //d For now, just stop aiming
     if (unit.state !== "moving") {
       unit.state = "preparing";
       unit.orderIssuedAt = Date.now();
@@ -320,7 +337,6 @@ const loop = () => {
       unit.state = "idle";
       unit.target = null;
     } else {
-      console.log(currentSpeed);
       currentSpeed = currentSpeed + (TRAVEL_SPEED - currentSpeed) * 0.02;
 
       unit.x += (dx / length) * currentSpeed;
