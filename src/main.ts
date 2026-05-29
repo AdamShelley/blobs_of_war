@@ -52,8 +52,14 @@ const rowOffsets = [-0.5, 0.5];
 // Variables
 let aiming: boolean = false;
 let potentialAim: boolean = false;
+let rightClickAction: boolean = false;
 let aimEnd: { x: number; y: number } = { x: 0, y: 0 };
-let mouseDown: { x: number; y: number } = { x: 0, y: 0 };
+let mousePos = { x: 0, y: 0 };
+let mouseDown: { x: number; y: number; facing: number } = {
+  x: 0,
+  y: 0,
+  facing: 1,
+};
 let squish = 0;
 let currentSpeed = 0;
 
@@ -131,10 +137,64 @@ const draw = (): void => {
     ctx.stroke();
   }
 
+  if (rightClickAction) {
+    const angle = Math.atan2(
+      mousePos.y - mouseDown.y,
+      mousePos.x - mouseDown.x,
+    );
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+
+    const dragDist = Math.sqrt(
+      (mousePos.x - mouseDown.x) ** 2 + (mousePos.y - mouseDown.y) ** 2,
+    );
+
+    const totalUnits = colOffsets.length * rowOffsets.length; // 12
+    const cols =
+      dragDist < SPACING
+        ? colOffsets.length
+        : Math.min(totalUnits, Math.max(2, Math.round(dragDist / SPACING)));
+    const rows = Math.ceil(totalUnits / cols);
+
+    const dynColOffsets = Array.from({ length: cols }, (_, i) => i);
+    const dynRowOffsets = Array.from({ length: rows }, (_, j) => j);
+
+    ctx.fillStyle = "rgb(0 200 0 / 70%)";
+
+    for (let j = 0; j < dynRowOffsets.length; j++) {
+      const unitsInThisRow =
+        j === dynRowOffsets.length - 1
+          ? totalUnits - j * cols // last row may be partial
+          : cols;
+      const rowOffset = (cols - unitsInThisRow) / 2; // center it
+
+      for (let i = 0; i < unitsInThisRow; i++) {
+        const dx = (i + rowOffset) * SPACING;
+        const dy = j * SPACING;
+
+        const rx = dx * cos - dy * sin;
+        const ry = dx * sin + dy * cos;
+
+        ctx.beginPath();
+        ctx.arc(
+          mouseDown.x + rx,
+          mouseDown.y + ry,
+          unit.radius + 2,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fill();
+      }
+    }
+  }
+
   if (aiming) {
     const headLen = 15;
 
     ctx.beginPath();
+
+    console.log("Aim arrow");
+
     const aimAngle = Math.atan2(aimEnd.y - unit.y, aimEnd.x - unit.x);
     const startX = unit.x + unit.radius * Math.cos(aimAngle);
     const startY = unit.y + unit.radius * Math.sin(aimAngle);
@@ -206,7 +266,8 @@ canvas.addEventListener("contextmenu", (e) => {
 });
 
 canvas.addEventListener("mousedown", (e) => {
-  if (e.button == 0) {
+  if (e.button == 0 || e.buttons == 0) {
+    rightClickAction = false;
     const leftEdge = unit.x - (colOffsets.length * SPACING) / 2 - UNIT_PADDING;
     const width = colOffsets.length * SPACING + UNIT_PADDING * 2;
     const rightEdge = leftEdge + width;
@@ -234,12 +295,17 @@ canvas.addEventListener("mousedown", (e) => {
       unit.selected = false;
     }
   } else if (e.button === 2) {
+    rightClickAction = true;
+    mousePos.x = e.offsetX;
+    mousePos.y = e.offsetY;
+    mouseDown.x = e.offsetX;
+    mouseDown.y = e.offsetY;
   }
 });
 
 canvas.addEventListener("mousemove", (e) => {
   // calculate the distance dx / dy
-  if (e.button === 0) {
+  if (e.button === 0 || e.buttons === 0) {
     if (potentialAim) {
       const dx = e.offsetX - mouseDown.x;
       const dy = e.offsetY - mouseDown.y;
@@ -253,12 +319,16 @@ canvas.addEventListener("mousemove", (e) => {
     if (aiming) {
       aimEnd = { x: e.offsetX, y: e.offsetY };
     }
-  } else if (e.button === 2) {
-    unit.facing = e.offsetX;
+  } else if (e.button === 2 || e.buttons === 2) {
+    rightClickAction = true;
+    mousePos.x = e.offsetX;
+    mousePos.y = e.offsetY;
   }
 });
 
 canvas.addEventListener("mouseup", () => {
+  rightClickAction = false;
+
   if (potentialAim && !aiming) {
     unit.selected = false;
   }
