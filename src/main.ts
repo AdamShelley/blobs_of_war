@@ -13,6 +13,9 @@ interface Unit {
   target: { x: number; y: number } | null;
   pendingTarget: { x: number; y: number } | null;
   facing: number;
+  cols: number[];
+  rows: number[];
+  angle: number;
 }
 
 // Constants
@@ -36,6 +39,9 @@ const unit: Unit = {
   target: null,
   pendingTarget: null,
   facing: 0,
+  cols: [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5],
+  rows: [-0.5, 0.5],
+  angle: 0,
 };
 
 // Canvas setup
@@ -45,9 +51,6 @@ canvas.height = Math.floor(SIZE * scale);
 canvas.style.width = SIZE + "px";
 canvas.style.height = SIZE + "px";
 ctx.scale(scale, scale);
-
-const colOffsets = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5];
-const rowOffsets = [-0.5, 0.5];
 
 // Variables
 let aiming: boolean = false;
@@ -69,12 +72,12 @@ const draw = (): void => {
 
   // Moving unit circles
   if (unit.state === "moving") {
-    for (let j = 0; j < rowOffsets.length; j++) {
-      for (let i = 0; i < colOffsets.length; i++) {
+    for (let j = 0; j < unit.rows.length; j++) {
+      for (let i = 0; i < unit.cols.length; i++) {
         ctx.beginPath();
         ctx.ellipse(
-          unit.x + colOffsets[i] * SPACING,
-          unit.y + rowOffsets[j] * SPACING,
+          unit.x + unit.cols[i] * SPACING,
+          unit.y + unit.rows[j] * SPACING,
           unit.radius - squish * 1,
           unit.radius + squish * 0.2,
           unit.facing,
@@ -86,13 +89,13 @@ const draw = (): void => {
     }
   } else {
     // Static unit circles
-    for (let j = 0; j < rowOffsets.length; j++) {
-      for (let i = 0; i < colOffsets.length; i++) {
+    for (let j = 0; j < unit.rows.length; j++) {
+      for (let i = 0; i < unit.cols.length; i++) {
         ctx.beginPath();
 
         ctx.arc(
-          unit.x + colOffsets[i] * SPACING,
-          unit.y + rowOffsets[j] * SPACING,
+          unit.x + unit.cols[i] * SPACING,
+          unit.y + unit.rows[j] * SPACING,
           unit.radius,
           0,
           Math.PI * 2,
@@ -105,14 +108,14 @@ const draw = (): void => {
   ctx.fillStyle = "rgb(92, 42, 24)";
 
   // Shield
-  for (let j = 0; j < rowOffsets.length; j++) {
-    for (let i = 0; i < colOffsets.length; i++) {
+  for (let j = 0; j < unit.rows.length; j++) {
+    for (let i = 0; i < unit.cols.length; i++) {
       ctx.beginPath();
       ctx.strokeStyle = "rgb(255, 255, 255)";
       ctx.lineWidth = 2;
       ctx.arc(
-        unit.x + colOffsets[i] * SPACING,
-        unit.y + rowOffsets[j] * SPACING,
+        unit.x + unit.cols[i] * SPACING,
+        unit.y + unit.rows[j] * SPACING,
         unit.radius + 2,
         unit.facing - Math.PI / 3,
         unit.facing + Math.PI / 3,
@@ -126,10 +129,10 @@ const draw = (): void => {
     ctx.beginPath();
     ctx.lineWidth = 1;
     ctx.roundRect(
-      unit.x - (colOffsets.length * SPACING) / 2 - UNIT_PADDING,
-      unit.y - (rowOffsets.length * SPACING) / 2 - UNIT_PADDING,
-      colOffsets.length * SPACING + UNIT_PADDING * 2,
-      rowOffsets.length * SPACING + UNIT_PADDING * 2,
+      unit.x - (unit.cols.length * SPACING) / 2 - UNIT_PADDING,
+      unit.y - (unit.rows.length * SPACING) / 2 - UNIT_PADDING,
+      unit.cols.length * SPACING + UNIT_PADDING * 2,
+      unit.rows.length * SPACING + UNIT_PADDING * 2,
       5,
     );
     ctx.strokeStyle = "rgb(255, 255, 255)";
@@ -149,23 +152,21 @@ const draw = (): void => {
       (mousePos.x - mouseDown.x) ** 2 + (mousePos.y - mouseDown.y) ** 2,
     );
 
-    const totalUnits = colOffsets.length * rowOffsets.length; // 12
+    const totalUnits = unit.cols.length * unit.rows.length;
     const cols =
       dragDist < SPACING
-        ? colOffsets.length
+        ? unit.cols.length
         : Math.min(totalUnits, Math.max(2, Math.round(dragDist / SPACING)));
     const rows = Math.ceil(totalUnits / cols);
 
-    const dynColOffsets = Array.from({ length: cols }, (_, i) => i);
     const dynRowOffsets = Array.from({ length: rows }, (_, j) => j);
 
     ctx.fillStyle = "rgb(0 200 0 / 70%)";
 
+    // silhouette
     for (let j = 0; j < dynRowOffsets.length; j++) {
       const unitsInThisRow =
-        j === dynRowOffsets.length - 1
-          ? totalUnits - j * cols // last row may be partial
-          : cols;
+        j === dynRowOffsets.length - 1 ? totalUnits - j * cols : cols;
       const rowOffset = (cols - unitsInThisRow) / 2; // center it
 
       for (let i = 0; i < unitsInThisRow; i++) {
@@ -223,13 +224,13 @@ const draw = (): void => {
     ctx.beginPath();
     ctx.fillStyle = "rgb(0 0 200 / 50%)";
 
-    for (let j = 0; j < rowOffsets.length; j++) {
-      for (let i = 0; i < colOffsets.length; i++) {
+    for (let j = 0; j < unit.rows.length; j++) {
+      for (let i = 0; i < unit.cols.length; i++) {
         ctx.beginPath();
 
         ctx.arc(
-          aimEnd.x + colOffsets[i] * SPACING,
-          aimEnd.y + rowOffsets[j] * SPACING,
+          aimEnd.x + unit.cols[i] * SPACING,
+          aimEnd.y + unit.rows[j] * SPACING,
           unit.radius + 2,
           0,
           Math.PI * 2,
@@ -245,12 +246,12 @@ const draw = (): void => {
     if (!unit?.target?.x || !unit?.target?.y) return;
     ctx.beginPath();
     ctx.fillStyle = "rgb(0 0 200 / 50%)";
-    for (let j = 0; j < rowOffsets.length; j++) {
-      for (let i = 0; i < colOffsets.length; i++) {
+    for (let j = 0; j < unit.rows.length; j++) {
+      for (let i = 0; i < unit.cols.length; i++) {
         ctx.beginPath();
         ctx.arc(
-          unit.x + colOffsets[i] * SPACING,
-          unit.y + rowOffsets[j] * SPACING,
+          unit.x + unit.cols[i] * SPACING,
+          unit.y + unit.rows[j] * SPACING,
           unit.radius,
           0,
           Math.PI * 2,
@@ -268,12 +269,12 @@ canvas.addEventListener("contextmenu", (e) => {
 canvas.addEventListener("mousedown", (e) => {
   if (e.button == 0 || e.buttons == 0) {
     rightClickAction = false;
-    const leftEdge = unit.x - (colOffsets.length * SPACING) / 2 - UNIT_PADDING;
-    const width = colOffsets.length * SPACING + UNIT_PADDING * 2;
+    const leftEdge = unit.x - (unit.cols.length * SPACING) / 2 - UNIT_PADDING;
+    const width = unit.cols.length * SPACING + UNIT_PADDING * 2;
     const rightEdge = leftEdge + width;
 
-    const topEdge = unit.y - (rowOffsets.length * SPACING) / 2 - UNIT_PADDING;
-    const height = rowOffsets.length * SPACING + UNIT_PADDING * 2;
+    const topEdge = unit.y - (unit.rows.length * SPACING) / 2 - UNIT_PADDING;
+    const height = unit.rows.length * SPACING + UNIT_PADDING * 2;
     const bottomEdge = topEdge + height;
 
     const dx = e.offsetX > leftEdge && e.offsetX < rightEdge;
@@ -326,8 +327,52 @@ canvas.addEventListener("mousemove", (e) => {
   }
 });
 
-canvas.addEventListener("mouseup", () => {
-  rightClickAction = false;
+canvas.addEventListener("mouseup", (e) => {
+  if (rightClickAction) {
+    const angle = Math.atan2(
+      mousePos.y - mouseDown.y,
+      mousePos.x - mouseDown.x,
+    );
+
+    unit.angle = angle;
+
+    const dragDist = Math.sqrt(
+      (mousePos.x - mouseDown.x) ** 2 + (mousePos.y - mouseDown.y) ** 2,
+    );
+
+    const totalUnits = unit.cols.length * unit.rows.length;
+    const cols =
+      dragDist < SPACING
+        ? unit.cols.length
+        : Math.min(totalUnits, Math.max(2, Math.round(dragDist / SPACING)));
+    const rows = Math.ceil(totalUnits / cols);
+
+    const dynRowOffsets = Array.from({ length: rows }, (_, j) => j);
+
+    // Generate the map
+    const tempCols = [];
+    for (let i = 0; i < cols; i++) {
+      tempCols.push(i - (cols - 1) / 2);
+    }
+
+    const tempRows = [];
+    for (let i = 0; i < dynRowOffsets.length; i++) {
+      tempRows.push(i - (rows - 1) / 2);
+    }
+
+    unit.cols = tempCols;
+    unit.rows = tempRows;
+
+    if (unit.state !== "moving") {
+      unit.state = "preparing";
+      unit.orderIssuedAt = Date.now();
+    } else {
+      unit.orderIssuedAt = Date.now();
+      unit.state = "preparing";
+    }
+
+    unit.pendingTarget = { x: mouseDown.x, y: mouseDown.y };
+  }
 
   if (potentialAim && !aiming) {
     unit.selected = false;
@@ -351,6 +396,7 @@ canvas.addEventListener("mouseup", () => {
 
   aiming = false;
   potentialAim = false;
+  rightClickAction = false;
 });
 
 const loop = () => {
